@@ -33,42 +33,54 @@
 			<div class="col-xs-12">
 			
 				<h1>All Users</h1>
-				<form action="all_users.php" method="get" >
-					<p>Start with letter</p><input type="text" id="name" name="name" >
-					<p>and status is: </p> <select name="status">
-												<option value="option1">Waiting for account validation</option>
-												<option value="option2">Active account</option>
-												<option value="option3">Waiting for account deletion</option>
-												
-											</select>
-				</form>
-				<input type="button" value="ok" />
+				<div class="formulaire"style="width:300px;">
+					<form action="all_users.php" method="get">
+						<p>Start with letter </p>
+						<input type="text" name="letter" class="form-control" <?php if(isset($_GET['letter'])){echo "value='".$_GET['letter']."' ";}?>/><br />
+						<p>And status is </p>
+						<select class="form-control" name="status">
+							<option value="1" <?php if(isset($_GET['letter']) && $_GET['status']){echo "selected";}?>>Waiting for account validation</option>
+							<option value="2" <?php if(isset($_GET['letter']) && $_GET['status']){echo "selected";}?>>Active account</option>
+							<option value="3" <?php if(isset($_GET['letter']) && $_GET['status']){echo "selected";}?>>Waiting for account deletion</option>
+						</select><br />
+						<input type="submit" value="OK" class="form-control" style="width: 50px;" /><br />
+					</form>
+				</div>
 				
 				<table class="table table-bordered table-striped">
-					<tr>
-						<th>Id</th>
-						<th>Username</th>
-						<th>Email</th>
-						<th>Status</th>
-					<tr>
 					
 					<?php
-						$status_id = 2;
-						$lettreDebut = 'e';
 					
-						$stmt = $pdo->query('SELECT users.id AS id, username, email, name
-											 FROM users
-											 JOIN status
-											 ON users.status_id = status.id
-											 WHERE status_id = '.$status_id.'
-											 AND username LIKE \''.$lettreDebut.'%'.'\'');
-						while ($row = $stmt->fetch()) {
+						if (isset($_GET['letter'])) {
+							
 							echo "<tr>";
-								echo "<td>".$row['id']."</td>";
-								echo "<td>".$row['username']."</td>";
-								echo "<td>".$row['email']."</td>";
-								echo "<td>".$row['name']."</td>";
-							echo "</tr>";
+								echo "<th>Id</th>";
+								echo "<th>Username</th>";
+								echo "<th>Email</th>";
+								echo "<th>Status</th>";
+							echo "<tr>";
+					
+							$status_id = $_GET['status'];
+							$lettreDebut = $_GET['letter'].'%';
+							
+							$stmt = $pdo->prepare("SELECT users.id AS id, username, email, name
+												   FROM users
+												   JOIN status
+												   ON users.status_id = status.id
+												   WHERE status_id = :status_id
+												   AND username LIKE :lettreDebut;");
+												   
+							$stmt->execute(['status_id' => $status_id, 'lettreDebut' => $lettreDebut]);
+					
+							while ($row = $stmt->fetch()) {
+								echo "<tr>";
+									echo "<td>".$row['id']."</td>";
+									echo "<td>".$row['username']."</td>";
+									echo "<td>".$row['email']."</td>";
+									echo "<td>".$row['name']."</td>";
+								echo "</tr>";
+							}
+							
 						}
 					?>
 				</table>			
