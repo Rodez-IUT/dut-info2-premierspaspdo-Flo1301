@@ -1,91 +1,106 @@
-<!DOCTYPE html>
+<?php
+$host = 'localhost';
+$db   = 'my-activities';
+$user = 'root';
+$pass = 'root';
+$charset = 'utf8mb4';
+$dsn = "mysql:host=$host;dbname=$db;charset=$charset";
+$options = [
+    PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+    PDO::ATTR_EMULATE_PREPARES   => false,
+];
+try {
+     $pdo = new PDO($dsn, $user, $pass, $options);
+} catch (PDOException $e) {
+     throw new PDOException($e->getMessage(), (int)$e->getCode());
+}
+
+// Si demande de suppression
+if (isset($_GET["action"]) AND $_GET["action"] == "askDeletion"
+    AND isset($_GET["status_id"]) AND isset($_GET["user_id"])) {
+	
+	// Commencer la transaction
+	$pdo->beginTransaction();
+	
+	// Enregistrer l'action dans les logs
+	$insert = $pdo->prepare("INSERT INTO action_log (action_date, action_name, user_id) VALUES (?, ?, ?)");
+	$insert->execute([date("Y-m-d H:i:s"), $_GET["action"], $_GET["user_id"]]);
+	
+	// Enoncé erronné
+	$probleme = $pdo->query("SELECT uneValeur FROM uneTable");
+	
+	// Update le statut de l'user
+	$update = $pdo->prepare("UPDATE users SET status_id = ? WHERE id = ?");
+	$update->execute([$_GET["status_id"], $_GET["user_id"]]);
+	
+	// Commit la transaction
+	$pdo->commit();
+}
+
+if (isset($_GET["submit"]) AND isset($_GET["statut"]) AND isset($_GET["lettre"])) {
+	$status_id = $_GET["statut"];
+	$userLike = $_GET["lettre"] ."%";
+
+	$get = $pdo->prepare("	SELECT u.id, u.username, u.email, s.name status_intitul 
+							FROM users u 
+							INNER JOIN status s ON s.id = u.status_id 
+							WHERE u.status_id = :status_id AND u.username LIKE :userLike
+							ORDER BY u.username ASC");
+
+	$get->execute(["status_id" => $status_id, "userLike" => $userLike]);
+}
+
+?>
 <html>
 <head>
-
-	<link href="css/bootstrap.css" rel="stylesheet"/>
-	<meta charset="utf-8" />
-	<title>Activite 2</title>
-
-	<?php
-		$host = 'localhost';
-		$db   = 'my_activities';
-		$user = 'root';
-		$pass = 'root';
-		$charset = 'utf8';
-		$dsn = "mysql:host=$host;dbname=$db;charset=$charset";
-		
-		$options = [
-			PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-			PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-			PDO::ATTR_EMULATE_PREPARES   => false,
-		];
-		try {
-			 $pdo = new PDO($dsn, $user, $pass, $options);
-		} catch (PDOException $e) {
-			echo $e->getMessage();
-			throw new PDOException($e->getMessage(), (int)$e->getCode());
-		}
-	?>
+	<meta charset="utf-8">
+	<link rel="steelsheet" href="css/bootstrap.css" />
 </head>
 <body>
-	<div class="container">
-		<div class="row">
-			<div class="col-xs-12">
-			
-				<h1>All Users</h1>
-				<div class="formulaire"style="width:300px;">
-					<form action="all_users.php" method="get">
-						<p>Start with letter </p>
-						<input type="text" name="letter" class="form-control" <?php if(isset($_GET['letter'])){echo "value='".$_GET['letter']."' ";}?>/><br />
-						<p>And status is </p>
-						<select class="form-control" name="status">
-							<option value="1" <?php if(isset($_GET['letter']) && $_GET['status']){echo "selected";}?>>Waiting for account validation</option>
-							<option value="2" <?php if(isset($_GET['letter']) && $_GET['status']){echo "selected";}?>>Active account</option>
-							<option value="3" <?php if(isset($_GET['letter']) && $_GET['status']){echo "selected";}?>>Waiting for account deletion</option>
-						</select><br />
-						<input type="submit" value="OK" class="form-control" style="width: 50px;" /><br />
-					</form>
-				</div>
-				
-				<table class="table table-bordered table-striped">
-					
+	<h1>All users</h1>
+	<div>
+		<form action="" method="GET">
+			Nom commençant par la lettre: <input type="text" name="lettre">
+			<br>Avec statut:
+			<select name="statut">
+				<option value="1">Waiting for account validation</option>
+				<option value="2">Active account</option>
+				<option value="3">Waiting for account deletion</option>
+			</select>
+			<br><br><input type="submit" name="submit" value="Valider">
+		</form>
+	</div>
+	<table>
+		<tr>
+			<th>Id</th>
+			<th>Username</th>
+			<th>Email</th>
+			<th>Status</th>
+		</tr>
+		<?php
+		if (isset($get)) {
+			while ($fetch = $get->fetch()) {
+				?>
+				<tr>
+					<td><?= $fetch["id"] ?></td>
+					<td><?= $fetch["username"] ?></td>
+					<td><?= $fetch["email"] ?></td>
+					<td><?= $fetch["status_intitul"] ?></td>
 					<?php
 					
-						if (isset($_GET['letter'])) {
-							
-							echo "<tr>";
-								echo "<th>Id</th>";
-								echo "<th>Username</th>";
-								echo "<th>Email</th>";
-								echo "<th>Status</th>";
-							echo "<tr>";
+					if ($fetch["status_intitul"] != "Waiting for account deletion") {
+						?>
+						<td><a href="./all_users.php?status_id=3&user_id=<?= $fetch["id"] ?>&action=askDeletion">Demander la suppression</a></td>
+						<?php
+					}
 					
-							$status_id = $_GET['status'];
-							$lettreDebut = $_GET['letter'].'%';
-							
-							$stmt = $pdo->prepare("SELECT users.id AS id, username, email, name
-												   FROM users
-												   JOIN status
-												   ON users.status_id = status.id
-												   WHERE status_id = :status_id
-												   AND username LIKE :lettreDebut;");
-												   
-							$stmt->execute(['status_id' => $status_id, 'lettreDebut' => $lettreDebut]);
-					
-							while ($row = $stmt->fetch()) {
-								echo "<tr>";
-									echo "<td>".$row['id']."</td>";
-									echo "<td>".$row['username']."</td>";
-									echo "<td>".$row['email']."</td>";
-									echo "<td>".$row['name']."</td>";
-								echo "</tr>";
-							}
-							
-						}
 					?>
-				</table>			
-			</div>
-		</div>
-	</div>
+				</tr>
+				<?php
+			}
+		}
+		?>
+	</table>
 </body>
 </html>
